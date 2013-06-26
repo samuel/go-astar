@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
 	"runtime/pprof"
 	"time"
 
@@ -199,6 +200,9 @@ func main() {
 	}
 
 	log.Println("Finding path")
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	totalAlloc := memStats.TotalAlloc
 	t := time.Now()
 	path, err := astar.FindPath(im, 0, img.Bounds().Dx()-1+img.Bounds().Dx()*(img.Bounds().Dy()-1))
 	pprof.StopCPUProfile()
@@ -206,6 +210,8 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("\t%d ms", time.Since(t).Nanoseconds()/1e6)
+	runtime.ReadMemStats(&memStats)
+	log.Printf("\t%d MB allocated", (memStats.TotalAlloc-totalAlloc)/(1024*1024))
 
 	log.Printf("Nodes in path: %d", len(path))
 
