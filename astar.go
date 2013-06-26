@@ -88,38 +88,36 @@ func FindPath(mp Map, start int, end int) []int {
 
 	var path []int
 	for {
-		parent := open.PopBest()
-		if parent.node == end {
+		current := open.PopBest()
+		if current.node == end {
 			// If we reached the end node then we know the optimal path. Traverse
 			// it (backwards) and return an array of node IDs.
-			path = make([]int, parent.count)
-			for i, n := parent.count-1, parent; n != nil; i, n = i-1, n.parent {
+			path = make([]int, current.count)
+			for i, n := current.count-1, current; n != nil; i, n = i-1, n.parent {
 				path[i] = n.node
 			}
 			break
 		}
-		parent.open = false
-		neighbors := mp.Neighbors(parent.node)
+		current.open = false
+		neighbors := mp.Neighbors(current.node)
 		for _, e := range neighbors {
 			n := e.Node
 
 			// Don't go backwards
-			if parent.parent != nil && n == parent.parent.node {
+			if current.parent != nil && n == current.parent.node {
 				continue
 			}
 
 			// Cost for the neighbor node is the current cost plus the
 			// cost to get to that node.
-			cost := parent.cost + e.Cost
+			cost := current.cost + e.Cost
 
-			ni := nodes[n]
-			if ni == nil {
-				// We haven't seen this node so create a new nodeInfo
-				// and add it to the open list.
+			if ni := nodes[n]; ni == nil {
+				// We haven't seen this node so add it to the open list.
 				ni := &nodeInfo{
 					node:          n,
-					parent:        parent,
-					count:         parent.count + 1,
+					parent:        current,
+					count:         current.count + 1,
 					cost:          cost,
 					predictedCost: mp.HeuristicCost(n, end),
 					open:          true,
@@ -134,8 +132,8 @@ func FindPath(mp Map, start int, end int) []int {
 					open.RemoveNodeInfo(ni)
 				}
 				ni.open = true
-				ni.parent = parent
-				ni.count = parent.count + 1
+				ni.parent = current
+				ni.count = current.count + 1
 				ni.cost = cost
 				open.AddNodeInfo(ni)
 			}
