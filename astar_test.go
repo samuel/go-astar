@@ -23,7 +23,7 @@ func abs(i int) int {
 	return i
 }
 
-func (g *gridMap) Neighbors(node int) []Edge {
+func (g *gridMap) Neighbors(node int) ([]Edge, error) {
 	edges := make([]Edge, 0, 8)
 	addNode := func(x, y int, cost float64) {
 		v := g.grid[y*g.width+x]
@@ -59,17 +59,17 @@ func (g *gridMap) Neighbors(node int) []Edge {
 	if y < (g.height - 1) {
 		addNode(x, y+1, 1)
 	}
-	return edges
+	return edges, nil
 }
 
-func (g *gridMap) HeuristicCost(start int, end int) float64 {
+func (g *gridMap) HeuristicCost(start int, end int) (float64, error) {
 	endY := end / g.width
 	endX := end % g.width
 	startY := start / g.width
 	startX := start % g.width
 	a := abs(endY - startY)
 	b := abs(endX - startX)
-	return math.Sqrt(float64(a*a + b*b))
+	return math.Sqrt(float64(a*a + b*b)), nil
 }
 
 func TestAstar(t *testing.T) {
@@ -89,7 +89,10 @@ func TestAstar(t *testing.T) {
 		width:  10,
 		height: 10,
 	}
-	path := FindPath(mp, 5*mp.width, 3*mp.width+9)
+	path, err := FindPath(mp, 5*mp.width, 3*mp.width+9)
+	if err != nil {
+		t.Fatal(err)
+	}
 	expected := []int{50, 40, 30, 20, 10, 1, 2, 13, 23, 33, 43, 53, 63, 73, 83, 94, 85, 86, 77, 68, 59, 49, 39}
 	if len(path) < len(expected) {
 		t.Fatalf("Expected a path length of %d instead of %d", len(expected), len(path))
@@ -119,6 +122,29 @@ func TestAstar(t *testing.T) {
 			}
 		}
 		fmt.Println()
+	}
+}
+
+func TestImpossible(t *testing.T) {
+	mp := &gridMap{
+		grid: []int{
+			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+			1, 1, 1, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 1, 0, 1, 0, 0, 1, 1, 0,
+			0, 0, 1, 0, 1, 0, 0, 0, 1, 0,
+			0, 0, 1, 0, 1, 0, 0, 1, 0, 0,
+			1, 1, 1, 0, 1, 0, 1, 0, 0, 0,
+			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		},
+		width:  10,
+		height: 10,
+	}
+	_, err := FindPath(mp, 5*mp.width, 3*mp.width+9)
+	if err != ErrImpossible {
+		t.Fatal("Expected ErrImpossible when no path is possible")
 	}
 }
 

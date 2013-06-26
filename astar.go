@@ -2,7 +2,10 @@ package astar
 
 import (
 	"container/heap"
+	"errors"
 )
+
+var ErrImpossible = errors.New("astar: no path exists between start and end")
 
 type Edge struct {
 	Node int     // destination node
@@ -10,8 +13,8 @@ type Edge struct {
 }
 
 type Graph interface {
-	Neighbors(node int) []Edge
-	HeuristicCost(start, end int) float64
+	Neighbors(node int) ([]Edge, error)
+	HeuristicCost(start, end int) (float64, error)
 }
 
 type nodeInfo struct {
@@ -60,6 +63,9 @@ func (nl *nodeList) Clear() {
 }
 
 func (nl *nodeList) PopBest() *nodeInfo {
+	if len(*nl) == 0 {
+		return nil
+	}
 	return heap.Pop(nl).(*nodeInfo)
 }
 
@@ -76,7 +82,10 @@ func (nl *nodeList) RemoveNodeInfo(ni *nodeInfo) {
 	}
 }
 
-func FindPath(mp Graph, start, end int) []int {
+// Find the optimal path through the graph from start to end and
+// return the nodes in order for the path. If no path is found
+// because it's impossible to reach end from start then return an error.
+func FindPath(mp Graph, start, end int) ([]int, error) {
 	nodes := make(map[int]*nodeInfo)
 	// The open heap is ordered by the sum of current cost + heuristic cost
 	nl := nodeList(make([]*nodeInfo, 0))
@@ -84,31 +93,40 @@ func FindPath(mp Graph, start, end int) []int {
 	heap.Init(open)
 
 	// Add the start node to the openlist
+	pCost, err := mp.HeuristicCost(start, end)
+	if err != nil {
+		return nil, err
+	}
 	ni := &nodeInfo{
 		node:          start,
 		parent:        nil,
 		count:         1,
 		cost:          0,
-		predictedCost: mp.HeuristicCost(start, end),
+		predictedCost: pCost,
 		open:          true,
 	}
 	open.AddNodeInfo(ni)
 	nodes[ni.node] = ni
 
-	var path []int
 	for {
 		current := open.PopBest()
+		if current == nil {
+			return nil, ErrImpossible
+		}
 		if current.node == end {
 			// If we reached the end node then we know the optimal path. Traverse
 			// it (backwards) and return an array of node IDs.
-			path = make([]int, current.count)
+			path := make([]int, current.count)
 			for i, n := current.count-1, current; n != nil; i, n = i-1, n.parent {
 				path[i] = n.node
 			}
-			break
+			return path, nil
 		}
 		current.open = false
-		neighbors := mp.Neighbors(current.node)
+		neighbors, err := mp.Neighbors(current.node)
+		if err != nil {
+			return nil, err
+		}
 		for _, edge := range neighbors {
 			// Don't try go backwards
 			if current.parent != nil && edge.Node == current.parent.node {
@@ -121,12 +139,16 @@ func FindPath(mp Graph, start, end int) []int {
 
 			if ni := nodes[edge.Node]; ni == nil {
 				// We haven't seen this node so add it to the open list.
+				pCost, err := mp.HeuristicCost(edge.Node, end)
+				if err != nil {
+					return nil, err
+				}
 				ni := &nodeInfo{
 					node:          edge.Node,
 					parent:        current,
 					count:         current.count + 1,
 					cost:          cost,
-					predictedCost: mp.HeuristicCost(edge.Node, end),
+					predictedCost: pCost,
 					open:          true,
 				}
 				open.AddNodeInfo(ni)
@@ -146,5 +168,4 @@ func FindPath(mp Graph, start, end int) []int {
 			}
 		}
 	}
-	return path
 }
