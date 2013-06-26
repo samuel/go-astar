@@ -90,7 +90,15 @@ func TestAstar(t *testing.T) {
 		height: 10,
 	}
 	path := FindPath(mp, 5*mp.width, 3*mp.width+9)
-	fmt.Printf("%+v\n", path)
+	expected := []int{50, 40, 30, 20, 10, 1, 2, 13, 23, 33, 43, 53, 63, 73, 83, 94, 85, 86, 77, 68, 59, 49, 39}
+	if len(path) < len(expected) {
+		t.Fatalf("Expected a path length of %d instead of %d", len(expected), len(path))
+	}
+	for i, e := range expected {
+		if path[i] != e {
+			t.Fatalf("Expected node at path index %d to be %d instead of %d", i, e, path[i])
+		}
+	}
 	for y := 0; y < mp.height; y++ {
 		for x := 0; x < mp.width; x++ {
 			o := y*mp.width + x

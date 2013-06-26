@@ -20,6 +20,7 @@ type nodeInfo struct {
 	count         int       // count lets use know how long the path is when we reach the end without traversing it
 	cost          float64   // current cost from start node to this node
 	predictedCost float64   // heuristic cost from this node to end node
+	open          bool
 }
 
 type nodeList []*nodeInfo
@@ -66,29 +67,24 @@ func (nl *nodeList) AddNodeInfo(ni *nodeInfo) {
 	heap.Push(nl, ni)
 }
 
-// Find node in the list and return the *nodeInfo and index in the list.
-// If the node is not in the list, then return nil, -1
-func (nl *nodeList) FindNode(n int) (*nodeInfo, int) {
-	for i, ni := range *nl {
-		if ni.node == n {
-			return ni, i
+func (nl *nodeList) RemoveNodeInfo(ni *nodeInfo) {
+	for i, nodeInfo := range *nl {
+		if nodeInfo.node == ni.node {
+			heap.Remove(nl, i)
+			break
 		}
 	}
-	return nil, -1
-}
-
-// Remove item at 'index'
-func (nl *nodeList) Remove(index int) {
-	heap.Remove(nl, index)
 }
 
 func FindPath(mp Map, start int, end int) []int {
-	closed := make(map[int]*nodeInfo)
+	nodes := make(map[int]*nodeInfo)
 	// The open heap is ordered by the sum of current cost + heuristic cost
 	nl := nodeList(make([]*nodeInfo, 0))
 	open := &nl
 	heap.Init(open)
-	open.Push(&nodeInfo{start, nil, 1, 0, mp.HeuristicCost(start, end)})
+	ni := &nodeInfo{start, nil, 1, 0, mp.HeuristicCost(start, end), true}
+	open.Push(ni)
+	nodes[ni.node] = ni
 
 	var path []int
 	for {
@@ -102,13 +98,13 @@ func FindPath(mp Map, start int, end int) []int {
 			}
 			break
 		}
-		closed[parent.node] = parent
+		parent.open = false
 		neighbors := mp.Neighbors(parent.node)
 		for _, e := range neighbors {
 			n := e.Node
 
-			// The node must not be a neighbor of itself
-			if n == parent.node {
+			// Don't go backwards
+			if parent.parent != nil && n == parent.parent.node {
 				continue
 			}
 
@@ -116,25 +112,31 @@ func FindPath(mp Map, start int, end int) []int {
 			// cost to get to that node.
 			cost := parent.cost + e.Cost
 
-			ni, nii := open.FindNode(n)
-			if ni != nil && cost < ni.cost {
-				open.Remove(nii)
-				ni = nil
-			} else {
-				ni = closed[n]
-				if ni != nil && cost < ni.cost {
-					delete(closed, n)
-					ni = nil
-				}
-			}
+			ni := nodes[n]
 			if ni == nil {
+				// We haven't seen this node so create a new nodeInfo
+				// and add it to the open list.
 				ni := &nodeInfo{
 					node:          n,
 					parent:        parent,
 					count:         parent.count + 1,
 					cost:          cost,
 					predictedCost: mp.HeuristicCost(n, end),
+					open:          true,
 				}
+				open.AddNodeInfo(ni)
+				nodes[n] = ni
+			} else if cost < ni.cost {
+				// We've seen this node and the current path is cheaper
+				// so update the changed info and add it to the open list
+				// (replacing if necessary).
+				if ni.open {
+					open.RemoveNodeInfo(ni)
+				}
+				ni.open = true
+				ni.parent = parent
+				ni.count = parent.count + 1
+				ni.cost = cost
 				open.AddNodeInfo(ni)
 			}
 		}
