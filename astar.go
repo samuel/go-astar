@@ -9,9 +9,9 @@ type Edge struct {
 	Cost float64 // cost to move to the node
 }
 
-type Map interface {
+type Graph interface {
 	Neighbors(node int) []Edge
-	HeuristicCost(start int, end int) float64
+	HeuristicCost(start, end int) float64
 }
 
 type nodeInfo struct {
@@ -76,14 +76,23 @@ func (nl *nodeList) RemoveNodeInfo(ni *nodeInfo) {
 	}
 }
 
-func FindPath(mp Map, start int, end int) []int {
+func FindPath(mp Graph, start, end int) []int {
 	nodes := make(map[int]*nodeInfo)
 	// The open heap is ordered by the sum of current cost + heuristic cost
 	nl := nodeList(make([]*nodeInfo, 0))
 	open := &nl
 	heap.Init(open)
-	ni := &nodeInfo{start, nil, 1, 0, mp.HeuristicCost(start, end), true}
-	open.Push(ni)
+
+	// Add the start node to the openlist
+	ni := &nodeInfo{
+		node:          start,
+		parent:        nil,
+		count:         1,
+		cost:          0,
+		predictedCost: mp.HeuristicCost(start, end),
+		open:          true,
+	}
+	open.AddNodeInfo(ni)
 	nodes[ni.node] = ni
 
 	var path []int
@@ -100,30 +109,28 @@ func FindPath(mp Map, start int, end int) []int {
 		}
 		current.open = false
 		neighbors := mp.Neighbors(current.node)
-		for _, e := range neighbors {
-			n := e.Node
-
-			// Don't go backwards
-			if current.parent != nil && n == current.parent.node {
+		for _, edge := range neighbors {
+			// Don't try go backwards
+			if current.parent != nil && edge.Node == current.parent.node {
 				continue
 			}
 
 			// Cost for the neighbor node is the current cost plus the
 			// cost to get to that node.
-			cost := current.cost + e.Cost
+			cost := current.cost + edge.Cost
 
-			if ni := nodes[n]; ni == nil {
+			if ni := nodes[edge.Node]; ni == nil {
 				// We haven't seen this node so add it to the open list.
 				ni := &nodeInfo{
-					node:          n,
+					node:          edge.Node,
 					parent:        current,
 					count:         current.count + 1,
 					cost:          cost,
-					predictedCost: mp.HeuristicCost(n, end),
+					predictedCost: mp.HeuristicCost(edge.Node, end),
 					open:          true,
 				}
 				open.AddNodeInfo(ni)
-				nodes[n] = ni
+				nodes[edge.Node] = ni
 			} else if cost < ni.cost {
 				// We've seen this node and the current path is cheaper
 				// so update the changed info and add it to the open list
