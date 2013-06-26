@@ -1,8 +1,12 @@
 package astar
 
 import (
-	"container/heap"
 	"errors"
+)
+
+const (
+	maxDefaultMapCapacity = 131072
+	defaultListCapacity   = 4096
 )
 
 var ErrImpossible = errors.New("astar: no path exists between start and end")
@@ -13,7 +17,9 @@ type Edge struct {
 }
 
 type Graph interface {
-	Neighbors(node int) ([]Edge, error)
+	// Edges is passed in for reuse. This method gets called a large number of times
+	// so we don't want to allocate an Edge slice for every call.
+	Neighbors(node int, edges []Edge) ([]Edge, error)
 	HeuristicCost(start, end int) (float64, error)
 }
 
@@ -24,74 +30,105 @@ type nodeInfo struct {
 	cost          float64   // current cost from start node to this node
 	predictedCost float64   // heuristic cost from this node to end node
 	open          bool
+	index         int
 }
 
-type nodeList []*nodeInfo
-
-func (nl *nodeList) Len() int {
-	return len(*nl)
+type nodeList struct {
+	nodes []*nodeInfo
 }
 
-func (nl *nodeList) Less(i, j int) bool {
-	l := *nl
-	li := l[i]
-	lj := l[j]
+func newNodeList() *nodeList {
+	return &nodeList{
+		nodes: make([]*nodeInfo, 0, defaultListCapacity),
+	}
+}
+
+func (nl *nodeList) len() int {
+	return len(nl.nodes)
+}
+
+func (nl *nodeList) less(i, j int) bool {
+	li := nl.nodes[i]
+	lj := nl.nodes[j]
 	return (li.cost + li.predictedCost) < (lj.cost + lj.predictedCost)
 }
 
-func (nl *nodeList) Swap(i, j int) {
-	l := *nl
+func (nl *nodeList) swap(i, j int) {
+	l := nl.nodes
 	l[i], l[j] = l[j], l[i]
+	l[i].index = i
+	l[j].index = j
 }
 
-func (nl *nodeList) Push(x interface{}) {
-	*nl = append(*nl, x.(*nodeInfo))
-}
-
-func (nl *nodeList) Pop() interface{} {
-	n := len(*nl)
-	if n == 0 {
-		return nil
+func (nl *nodeList) up(j int) {
+	for {
+		i := (j - 1) / 2 // parent
+		if i == j || !nl.less(j, i) {
+			break
+		}
+		nl.swap(i, j)
+		j = i
 	}
-	v := (*nl)[n-1]
-	*nl = (*nl)[:n-1]
-	return v
 }
 
-func (nl *nodeList) Clear() {
-	*nl = (*nl)[:0]
+func (nl *nodeList) down(i, n int) {
+	for {
+		j1 := 2*i + 1
+		if j1 >= n || j1 < 0 { // j1 < 0 after int overflow
+			break
+		}
+		j := j1 // left child
+		if j2 := j1 + 1; j2 < n && !nl.less(j1, j2) {
+			j = j2 // = 2*i + 2  // right child
+		}
+		if !nl.less(j, i) {
+			break
+		}
+		nl.swap(i, j)
+		i = j
+	}
 }
 
 func (nl *nodeList) PopBest() *nodeInfo {
-	if len(*nl) == 0 {
+	n := nl.len() - 1
+	if n < 0 {
 		return nil
 	}
-	return heap.Pop(nl).(*nodeInfo)
+	nl.swap(0, n)
+	nl.down(0, n)
+	v := nl.nodes[n]
+	nl.nodes = nl.nodes[:n]
+	v.index = -1
+	return v
 }
 
 func (nl *nodeList) AddNodeInfo(ni *nodeInfo) {
-	heap.Push(nl, ni)
+	nl.nodes = append(nl.nodes, ni)
+	ni.index = nl.len() - 1
+	nl.up(nl.len() - 1)
 }
 
-func (nl *nodeList) RemoveNodeInfo(ni *nodeInfo) {
-	for i, nodeInfo := range *nl {
-		if nodeInfo.node == ni.node {
-			heap.Remove(nl, i)
-			break
-		}
-	}
+func (nl *nodeList) UpdateNodeInfo(ni *nodeInfo) {
+	index := ni.index
+	n := nl.len()
+	nl.down(index, n)
+	nl.up(index)
 }
 
 // Find the optimal path through the graph from start to end and
 // return the nodes in order for the path. If no path is found
 // because it's impossible to reach end from start then return an error.
 func FindPath(mp Graph, start, end int) ([]int, error) {
-	nodes := make(map[int]*nodeInfo)
-	// The open heap is ordered by the sum of current cost + heuristic cost
-	nl := nodeList(make([]*nodeInfo, 0))
-	open := &nl
-	heap.Init(open)
-
+	mapCapacity := end - start
+	if mapCapacity < 0 {
+		mapCapacity = -mapCapacity
+	}
+	if mapCapacity > maxDefaultMapCapacity {
+		mapCapacity = maxDefaultMapCapacity
+	}
+	nodes := make(map[int]*nodeInfo, mapCapacity)
+	// The open list is ordered by the sum of current cost + heuristic cost
+	open := newNodeList()
 	// Add the start node to the openlist
 	pCost, err := mp.HeuristicCost(start, end)
 	if err != nil {
@@ -108,6 +145,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 	open.AddNodeInfo(ni)
 	nodes[ni.node] = ni
 
+	edgeSlice := make([]Edge, 0, 8)
 	for {
 		current := open.PopBest()
 		if current == nil {
@@ -123,7 +161,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 			return path, nil
 		}
 		current.open = false
-		neighbors, err := mp.Neighbors(current.node)
+		neighbors, err := mp.Neighbors(current.node, edgeSlice[:0])
 		if err != nil {
 			return nil, err
 		}
@@ -157,14 +195,16 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 				// We've seen this node and the current path is cheaper
 				// so update the changed info and add it to the open list
 				// (replacing if necessary).
-				if ni.open {
-					open.RemoveNodeInfo(ni)
-				}
+				wasOpen := ni.open
 				ni.open = true
 				ni.parent = current
 				ni.count = current.count + 1
 				ni.cost = cost
-				open.AddNodeInfo(ni)
+				if wasOpen {
+					open.UpdateNodeInfo(ni)
+				} else {
+					open.AddNodeInfo(ni)
+				}
 			}
 		}
 	}

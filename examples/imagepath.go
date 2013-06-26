@@ -4,11 +4,13 @@ import (
 	"errors"
 	"image"
 	"image/color"
-	_ "image/jpeg"
-	"image/png"
+	"image/jpeg"
+	_ "image/png"
 	"log"
 	"math"
 	"os"
+	"runtime/pprof"
+	"time"
 
 	"github.com/samuel/go-astar"
 )
@@ -29,16 +31,23 @@ type ImageMap struct {
 	setter func(x, y int, c color.Color)
 }
 
-func colorDiff(c1, c2 byte) float64 {
+func colorCost(c1, c2 byte) float64 {
 	a := abs(int(c1) - int(c2))
-	return float64(a * a)
+	return float64(a*a + 1)
 }
 
 func NewImageMap(img image.Image) (*ImageMap, error) {
 	var im *ImageMap
 	switch m := img.(type) {
 	case *image.YCbCr:
-		im = &ImageMap{m.Y, m.YStride, 1, img.Bounds().Dx(), img.Bounds().Dy(), 1.0, nil}
+		im = &ImageMap{
+			Pix:     m.Y,
+			YStride: m.YStride,
+			XStride: 1,
+			Width:   img.Bounds().Dx(),
+			Height:  img.Bounds().Dy(),
+			Stddev:  1.0,
+		}
 		var verticalRes, horizontalRes int
 		switch m.SubsampleRatio {
 		case image.YCbCrSubsampleRatio420:
@@ -65,9 +74,25 @@ func NewImageMap(img image.Image) (*ImageMap, error) {
 			m.Cr[off] = cr
 		}
 	case *image.RGBA:
-		im = &ImageMap{m.Pix[1:], m.Stride, 4, img.Bounds().Dx(), img.Bounds().Dy(), 1.0, m.Set}
+		im = &ImageMap{
+			Pix:     m.Pix[1:],
+			YStride: m.Stride,
+			XStride: 4,
+			Width:   img.Bounds().Dx(),
+			Height:  img.Bounds().Dy(),
+			Stddev:  1.0,
+			setter:  m.Set,
+		}
 	case *image.Gray:
-		im = &ImageMap{m.Pix, m.Stride, 1, img.Bounds().Dx(), img.Bounds().Dy(), 1.0, m.Set}
+		im = &ImageMap{
+			Pix:     m.Pix,
+			YStride: m.Stride,
+			XStride: 1,
+			Width:   img.Bounds().Dx(),
+			Height:  img.Bounds().Dy(),
+			Stddev:  1.0,
+			setter:  m.Set,
+		}
 	default:
 		return nil, errors.New("Unsupported image format")
 	}
@@ -95,37 +120,35 @@ func NewImageMap(img image.Image) (*ImageMap, error) {
 	return im, nil
 }
 
-func (im *ImageMap) Neighbors(node int) ([]astar.Edge, error) {
-	edges := make([]astar.Edge, 0, 8)
-
+func (im *ImageMap) Neighbors(node int, edges []astar.Edge) ([]astar.Edge, error) {
 	x := node % im.Width
 	y := node / im.Width
 	off := y*im.YStride + x*im.XStride
 	c := im.Pix[off]
 
 	if x > 0 {
-		edges = append(edges, astar.Edge{node - 1, colorDiff(c, im.Pix[off-im.XStride])})
+		edges = append(edges, astar.Edge{node - 1, colorCost(c, im.Pix[off-im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{node - 1 - im.Width, colorDiff(c, im.Pix[off-im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{node - 1 - im.Width, colorCost(c, im.Pix[off-im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{node - 1 + im.Width, colorDiff(c, im.Pix[off-im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{node - 1 + im.Width, colorCost(c, im.Pix[off-im.XStride+im.YStride])})
 		}
 	}
 	if x < im.Width-1 {
-		edges = append(edges, astar.Edge{node + 1, colorDiff(c, im.Pix[off+im.XStride])})
+		edges = append(edges, astar.Edge{node + 1, colorCost(c, im.Pix[off+im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{node + 1 - im.Width, colorDiff(c, im.Pix[off+im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{node + 1 - im.Width, colorCost(c, im.Pix[off+im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{node + 1 + im.Width, colorDiff(c, im.Pix[off+im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{node + 1 + im.Width, colorCost(c, im.Pix[off+im.XStride+im.YStride])})
 		}
 	}
 	if y > 0 {
-		edges = append(edges, astar.Edge{node - im.Width, colorDiff(c, im.Pix[off-im.YStride])})
+		edges = append(edges, astar.Edge{node - im.Width, colorCost(c, im.Pix[off-im.YStride])})
 	}
 	if y < im.Height-1 {
-		edges = append(edges, astar.Edge{node + im.Width, colorDiff(c, im.Pix[off+im.YStride])})
+		edges = append(edges, astar.Edge{node + im.Width, colorCost(c, im.Pix[off+im.YStride])})
 	}
 	return edges, nil
 }
@@ -137,7 +160,7 @@ func (im *ImageMap) HeuristicCost(start int, end int) (float64, error) {
 	startX := start % im.Width
 	a := abs(endY - startY)
 	b := abs(endX - startX)
-	return math.Sqrt(float64(a*a+b*b)) * im.Stddev, nil
+	return math.Sqrt(float64(a*a + b*b)), nil // * im.Stddev / 2, nil
 }
 
 func (im *ImageMap) Set(x, y int, c color.Color) {
@@ -158,25 +181,47 @@ func main() {
 		log.Fatal(err)
 	}
 
+	log.Println("Processing image")
 	im, err := NewImageMap(img)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if len(os.Args) > 2 {
+		wr, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer wr.Close()
+		if err := pprof.StartCPUProfile(wr); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Println("Finding path")
+	t := time.Now()
 	path, err := astar.FindPath(im, 0, img.Bounds().Dx()-1+img.Bounds().Dx()*(img.Bounds().Dy()-1))
+	pprof.StopCPUProfile()
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("\t%d ms", time.Since(t).Nanoseconds()/1e6)
 
+	log.Printf("Nodes in path: %d", len(path))
+
+	log.Println("Rendering path")
 	for _, node := range path {
 		x := node % img.Bounds().Dx()
 		y := node / img.Bounds().Dx()
-		im.Set(x, y, color.RGBA{255, 0, 0, 255})
+		im.Set(x, y, color.RGBA{0, 255, 0, 255})
 	}
-	wr, err := os.Create("out.png")
+
+	log.Println("Encoding/writing output image")
+	wr, err := os.Create("out.jpg")
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := png.Encode(wr, img); err != nil {
+	if err := jpeg.Encode(wr, img, nil); err != nil {
 		log.Fatal(err)
 	}
 	wr.Close()
