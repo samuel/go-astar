@@ -4,27 +4,22 @@ import (
 	"container/heap"
 )
 
-type Node struct {
-	X int
-	Y int
-}
-
 type Edge struct {
-	Node Node
+	Node int
 	Cost float64 // cost to move to this node
 }
 
+type Map interface {
+	Neighbors(node int) []Edge
+	HeuristicCost(start int, end int) float64
+}
+
 type nodeInfo struct {
-	node   Node
+	node   int
 	parent *nodeInfo
 	count  int
 	g      float64 // current cost from start node to this node
 	h      float64 // heuristic cost from this node to end node
-}
-
-type Map interface {
-	Neighbors(node Node) []Edge
-	HeuristicCost(start Node, end Node) float64
 }
 
 type nodeList []*nodeInfo
@@ -71,7 +66,7 @@ func (nl *nodeList) AddNodeInfo(ni *nodeInfo) {
 	heap.Push(nl, ni)
 }
 
-func (nl *nodeList) FindNode(n Node) (*nodeInfo, int) {
+func (nl *nodeList) FindNode(n int) (*nodeInfo, int) {
 	for i, ni := range *nl {
 		if ni.node == n {
 			return ni, i
@@ -84,18 +79,18 @@ func (nl *nodeList) Remove(i int) {
 	heap.Remove(nl, i)
 }
 
-func FindPath(mp Map, start Node, end Node) []Node {
-	closed := make(map[Node]*nodeInfo)
+func FindPath(mp Map, start int, end int) []int {
+	closed := make(map[int]*nodeInfo)
 	nl := nodeList(make([]*nodeInfo, 0))
 	open := &nl
 	heap.Init(open)
 	open.Push(&nodeInfo{start, nil, 1, 0, mp.HeuristicCost(start, end)})
 
-	var path []Node
+	var path []int
 	for {
 		parent := open.PopBest()
 		if parent.node == end {
-			path = make([]Node, parent.count)
+			path = make([]int, parent.count)
 			for i, n := parent.count-1, parent; n != nil; i, n = i-1, n.parent {
 				path[i] = n.node
 			}
