@@ -33,30 +33,32 @@ type nodeInfo struct {
 	open          bool
 }
 
-type nodeList struct {
-	nodes []*nodeInfo
+type state struct {
+	info map[int]*nodeInfo
+	heap []*nodeInfo
 }
 
-func newNodeList() *nodeList {
-	return &nodeList{
-		nodes: make([]*nodeInfo, 0, defaultListCapacity),
+func newState(capacity int) *state {
+	return &state{
+		info: make(map[int]*nodeInfo, capacity),
+		heap: make([]*nodeInfo, 0, defaultListCapacity),
 	}
 }
 
-func (nl *nodeList) less(i, j int) bool {
-	li := nl.nodes[i]
-	lj := nl.nodes[j]
+func (nl *state) less(i, j int) bool {
+	li := nl.heap[i]
+	lj := nl.heap[j]
 	return (li.cost + li.predictedCost) < (lj.cost + lj.predictedCost)
 }
 
-func (nl *nodeList) swap(i, j int) {
-	l := nl.nodes
+func (nl *state) swap(i, j int) {
+	l := nl.heap
 	l[i], l[j] = l[j], l[i]
 	l[i].index = i
 	l[j].index = j
 }
 
-func (nl *nodeList) up(j int) {
+func (nl *state) up(j int) {
 	for {
 		i := (j - 1) / 2 // parent
 		if i == j || !nl.less(j, i) {
@@ -67,7 +69,7 @@ func (nl *nodeList) up(j int) {
 	}
 }
 
-func (nl *nodeList) down(i, n int) {
+func (nl *state) down(i, n int) {
 	for {
 		j1 := 2*i + 1
 		if j1 >= n || j1 < 0 { // j1 < 0 after int overflow
@@ -85,28 +87,29 @@ func (nl *nodeList) down(i, n int) {
 	}
 }
 
-func (nl *nodeList) PopBest() *nodeInfo {
-	n := len(nl.nodes) - 1
+func (nl *state) popBest() *nodeInfo {
+	n := len(nl.heap) - 1
 	if n < 0 {
 		return nil
 	}
 	nl.swap(0, n)
 	nl.down(0, n)
-	v := nl.nodes[n]
-	nl.nodes = nl.nodes[:n]
+	v := nl.heap[n]
+	nl.heap = nl.heap[:n]
 	v.index = -1
 	return v
 }
 
-func (nl *nodeList) AddNodeInfo(ni *nodeInfo) {
-	nl.nodes = append(nl.nodes, ni)
-	ni.index = len(nl.nodes) - 1
-	nl.up(len(nl.nodes) - 1)
+func (nl *state) addNodeInfo(ni *nodeInfo) {
+	nl.info[ni.node] = ni
+	nl.heap = append(nl.heap, ni)
+	ni.index = len(nl.heap) - 1
+	nl.up(len(nl.heap) - 1)
 }
 
-func (nl *nodeList) UpdateNodeInfo(ni *nodeInfo) {
+func (nl *state) updateNodeInfo(ni *nodeInfo) {
 	index := ni.index
-	n := len(nl.nodes)
+	n := len(nl.heap)
 	nl.down(index, n)
 	nl.up(index)
 }
@@ -122,28 +125,25 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 	if mapCapacity > maxDefaultMapCapacity {
 		mapCapacity = maxDefaultMapCapacity
 	}
-	nodes := make(map[int]*nodeInfo, mapCapacity)
 	// The open list is ordered by the sum of current cost + heuristic cost
-	open := newNodeList()
+	state := newState(mapCapacity)
 	// Add the start node to the openlist
 	pCost, err := mp.HeuristicCost(start, end)
 	if err != nil {
 		return nil, err
 	}
-	ni := &nodeInfo{
+	state.addNodeInfo(&nodeInfo{
 		node:          start,
 		parent:        nil,
 		count:         1,
 		cost:          0,
 		predictedCost: pCost,
 		open:          true,
-	}
-	open.AddNodeInfo(ni)
-	nodes[ni.node] = ni
+	})
 
 	edgeSlice := make([]Edge, 0, 8)
 	for {
-		current := open.PopBest()
+		current := state.popBest()
 		if current == nil {
 			return nil, ErrImpossible
 		}
@@ -171,22 +171,20 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 			// cost to get to that node.
 			cost := current.cost + edge.Cost
 
-			if ni := nodes[edge.Node]; ni == nil {
+			if ni := state.info[edge.Node]; ni == nil {
 				// We haven't seen this node so add it to the open list.
 				pCost, err := mp.HeuristicCost(edge.Node, end)
 				if err != nil {
 					return nil, err
 				}
-				ni := &nodeInfo{
+				state.addNodeInfo(&nodeInfo{
 					node:          edge.Node,
 					parent:        current,
 					count:         current.count + 1,
 					cost:          cost,
 					predictedCost: pCost,
 					open:          true,
-				}
-				open.AddNodeInfo(ni)
-				nodes[edge.Node] = ni
+				})
 			} else if cost < ni.cost {
 				// We've seen this node and the current path is cheaper
 				// so update the changed info and add it to the open list
@@ -197,9 +195,9 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 				ni.count = current.count + 1
 				ni.cost = cost
 				if wasOpen {
-					open.UpdateNodeInfo(ni)
+					state.updateNodeInfo(ni)
 				} else {
-					open.AddNodeInfo(ni)
+					state.addNodeInfo(ni)
 				}
 			}
 		}
