@@ -5,8 +5,8 @@ import (
 )
 
 type Edge struct {
-	Node int
-	Cost float64 // cost to move to this node
+	Node int     // destination node
+	Cost float64 // cost to move to the node
 }
 
 type Map interface {
@@ -15,11 +15,11 @@ type Map interface {
 }
 
 type nodeInfo struct {
-	node   int
-	parent *nodeInfo
-	count  int
-	g      float64 // current cost from start node to this node
-	h      float64 // heuristic cost from this node to end node
+	node          int
+	parent        *nodeInfo // the node from which we came to get here
+	count         int       // count lets use know how long the path is when we reach the end without traversing it
+	cost          float64   // current cost from start node to this node
+	predictedCost float64   // heuristic cost from this node to end node
 }
 
 type nodeList []*nodeInfo
@@ -32,7 +32,7 @@ func (nl *nodeList) Less(i, j int) bool {
 	l := *nl
 	li := l[i]
 	lj := l[j]
-	return (li.g + li.h) < (lj.g + lj.h)
+	return (li.cost + li.predictedCost) < (lj.cost + lj.predictedCost)
 }
 
 func (nl *nodeList) Swap(i, j int) {
@@ -66,6 +66,8 @@ func (nl *nodeList) AddNodeInfo(ni *nodeInfo) {
 	heap.Push(nl, ni)
 }
 
+// Find node in the list and return the *nodeInfo and index in the list.
+// If the node is not in the list, then return nil, -1
 func (nl *nodeList) FindNode(n int) (*nodeInfo, int) {
 	for i, ni := range *nl {
 		if ni.node == n {
@@ -75,12 +77,14 @@ func (nl *nodeList) FindNode(n int) (*nodeInfo, int) {
 	return nil, -1
 }
 
-func (nl *nodeList) Remove(i int) {
-	heap.Remove(nl, i)
+// Remove item at 'index'
+func (nl *nodeList) Remove(index int) {
+	heap.Remove(nl, index)
 }
 
 func FindPath(mp Map, start int, end int) []int {
 	closed := make(map[int]*nodeInfo)
+	// The open heap is ordered by the sum of current cost + heuristic cost
 	nl := nodeList(make([]*nodeInfo, 0))
 	open := &nl
 	heap.Init(open)
@@ -90,6 +94,8 @@ func FindPath(mp Map, start int, end int) []int {
 	for {
 		parent := open.PopBest()
 		if parent.node == end {
+			// If we reached the end node then we know the optimal path. Traverse
+			// it (backwards) and return an array of node IDs.
 			path = make([]int, parent.count)
 			for i, n := parent.count-1, parent; n != nil; i, n = i-1, n.parent {
 				path[i] = n.node
@@ -100,29 +106,34 @@ func FindPath(mp Map, start int, end int) []int {
 		neighbors := mp.Neighbors(parent.node)
 		for _, e := range neighbors {
 			n := e.Node
+
+			// The node must not be a neighbor of itself
 			if n == parent.node {
 				continue
 			}
 
-			cost := parent.g + e.Cost
+			// Cost for the neighbor node is the current cost plus the
+			// cost to get to that node.
+			cost := parent.cost + e.Cost
+
 			ni, nii := open.FindNode(n)
-			if ni != nil && cost < ni.g {
+			if ni != nil && cost < ni.cost {
 				open.Remove(nii)
 				ni = nil
 			} else {
 				ni = closed[n]
-				if ni != nil && cost < ni.g {
+				if ni != nil && cost < ni.cost {
 					delete(closed, n)
 					ni = nil
 				}
 			}
 			if ni == nil {
 				ni := &nodeInfo{
-					node:   n,
-					parent: parent,
-					count:  parent.count + 1,
-					g:      cost,
-					h:      mp.HeuristicCost(n, end),
+					node:          n,
+					parent:        parent,
+					count:         parent.count + 1,
+					cost:          cost,
+					predictedCost: mp.HeuristicCost(n, end),
 				}
 				open.AddNodeInfo(ni)
 			}

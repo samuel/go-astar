@@ -2,6 +2,7 @@ package astar
 
 import (
 	"fmt"
+	"math"
 	"testing"
 )
 
@@ -66,7 +67,9 @@ func (g *gridMap) HeuristicCost(start int, end int) float64 {
 	endX := end % g.width
 	startY := start / g.width
 	startX := start % g.width
-	return float64(abs(endY-startY) + abs(endX-startX))
+	a := abs(endY - startY)
+	b := abs(endX - startX)
+	return math.Sqrt(float64(a*a + b*b))
 }
 
 func TestAstar(t *testing.T) {
@@ -108,5 +111,27 @@ func TestAstar(t *testing.T) {
 			}
 		}
 		fmt.Println()
+	}
+}
+
+func BenchmarkFindPath(b *testing.B) {
+	mp := &gridMap{
+		grid: []int{
+			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+			0, 1, 1, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 1, 0, 1, 0, 0, 1, 1, 0,
+			0, 0, 1, 0, 1, 0, 0, 0, 1, 0,
+			0, 0, 1, 0, 1, 0, 0, 1, 0, 0,
+			1, 1, 1, 0, 1, 0, 1, 0, 0, 0,
+			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		},
+		width:  10,
+		height: 10,
+	}
+	for i := 0; i < b.N; i++ {
+		FindPath(mp, 5*mp.width, 3*mp.width+9)
 	}
 }
