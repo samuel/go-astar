@@ -24,8 +24,8 @@ type Graph interface {
 }
 
 type nodeInfo struct {
-	parent        *nodeInfo // the node from which we came to get here
 	node          int32
+	parent        int32   // the node from which we came to get here
 	index         int32   // index of the node in the heap
 	cost          float32 // current cost from start node to this node
 	predictedCost float32 // heuristic cost from this node to end node
@@ -133,7 +133,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 	}
 	state.addNodeInfo(&nodeInfo{
 		node:          int32(start),
-		parent:        nil,
+		parent:        -1,
 		cost:          0.0,
 		predictedCost: float32(pCost),
 	})
@@ -148,7 +148,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 			// If we reached the end node then we know the optimal path. Traverse
 			// it (backwards) and return an array of node IDs.
 			path := make([]int, 0, 128)
-			for n := current; n != nil; n = n.parent {
+			for n := current; n != nil; n = state.info[n.parent] {
 				path = append(path, int(n.node))
 			}
 			// Reverse the path since we built it backwards
@@ -165,7 +165,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 		}
 		for _, edge := range neighbors {
 			// Don't try go backwards
-			if current.parent != nil && int32(edge.Node) == current.parent.node {
+			if int32(edge.Node) == current.parent {
 				continue
 			}
 
@@ -181,7 +181,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 				}
 				state.addNodeInfo(&nodeInfo{
 					node:          int32(edge.Node),
-					parent:        current,
+					parent:        current.node,
 					cost:          cost,
 					predictedCost: float32(pCost),
 				})
@@ -189,7 +189,7 @@ func FindPath(mp Graph, start, end int) ([]int, error) {
 				// We've seen this node and the current path is cheaper
 				// so update the changed info and add it to the open list
 				// (replacing if necessary).
-				ni.parent = current
+				ni.parent = current.node
 				ni.cost = cost
 				if ni.index >= 0 {
 					state.updateNodeInfo(ni)
