@@ -23,8 +23,7 @@ func abs(i int) int {
 	return i
 }
 
-func (g *gridMap) Neighbors(node int) ([]Edge, error) {
-	edges := make([]Edge, 0, 8)
+func (g *gridMap) Neighbors(node int, edges []Edge) ([]Edge, error) {
 	addNode := func(x, y int, cost float64) {
 		v := g.grid[y*g.width+x]
 		if v == 0 {

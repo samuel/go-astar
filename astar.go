@@ -29,8 +29,8 @@ type nodeInfo struct {
 	count         int       // count lets use know how long the path is when we reach the end without traversing it
 	cost          float64   // current cost from start node to this node
 	predictedCost float64   // heuristic cost from this node to end node
+	index         int       // index of the node in the heap
 	open          bool
-	index         int
 }
 
 type nodeList struct {
@@ -41,10 +41,6 @@ func newNodeList() *nodeList {
 	return &nodeList{
 		nodes: make([]*nodeInfo, 0, defaultListCapacity),
 	}
-}
-
-func (nl *nodeList) len() int {
-	return len(nl.nodes)
 }
 
 func (nl *nodeList) less(i, j int) bool {
@@ -90,7 +86,7 @@ func (nl *nodeList) down(i, n int) {
 }
 
 func (nl *nodeList) PopBest() *nodeInfo {
-	n := nl.len() - 1
+	n := len(nl.nodes) - 1
 	if n < 0 {
 		return nil
 	}
@@ -104,13 +100,13 @@ func (nl *nodeList) PopBest() *nodeInfo {
 
 func (nl *nodeList) AddNodeInfo(ni *nodeInfo) {
 	nl.nodes = append(nl.nodes, ni)
-	ni.index = nl.len() - 1
-	nl.up(nl.len() - 1)
+	ni.index = len(nl.nodes) - 1
+	nl.up(len(nl.nodes) - 1)
 }
 
 func (nl *nodeList) UpdateNodeInfo(ni *nodeInfo) {
 	index := ni.index
-	n := nl.len()
+	n := len(nl.nodes)
 	nl.down(index, n)
 	nl.up(index)
 }
