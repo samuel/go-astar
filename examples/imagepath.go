@@ -13,7 +13,7 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/samuel/go-astar"
+	"github.com/samuel/go-astar/astar"
 )
 
 func abs(v int) int {
@@ -128,28 +128,28 @@ func (im *ImageMap) Neighbors(node int, edges []astar.Edge) ([]astar.Edge, error
 	c := im.Pix[off]
 
 	if x > 0 {
-		edges = append(edges, astar.Edge{node - 1, colorCost(c, im.Pix[off-im.XStride])})
+		edges = append(edges, astar.Edge{Node: node - 1, Cost: colorCost(c, im.Pix[off-im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{node - 1 - im.Width, colorCost(c, im.Pix[off-im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{Node: node - 1 - im.Width, Cost: colorCost(c, im.Pix[off-im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{node - 1 + im.Width, colorCost(c, im.Pix[off-im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{Node: node - 1 + im.Width, Cost: colorCost(c, im.Pix[off-im.XStride+im.YStride])})
 		}
 	}
 	if x < im.Width-1 {
-		edges = append(edges, astar.Edge{node + 1, colorCost(c, im.Pix[off+im.XStride])})
+		edges = append(edges, astar.Edge{Node: node + 1, Cost: colorCost(c, im.Pix[off+im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{node + 1 - im.Width, colorCost(c, im.Pix[off+im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{Node: node + 1 - im.Width, Cost: colorCost(c, im.Pix[off+im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{node + 1 + im.Width, colorCost(c, im.Pix[off+im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{Node: node + 1 + im.Width, Cost: colorCost(c, im.Pix[off+im.XStride+im.YStride])})
 		}
 	}
 	if y > 0 {
-		edges = append(edges, astar.Edge{node - im.Width, colorCost(c, im.Pix[off-im.YStride])})
+		edges = append(edges, astar.Edge{Node: node - im.Width, Cost: colorCost(c, im.Pix[off-im.YStride])})
 	}
 	if y < im.Height-1 {
-		edges = append(edges, astar.Edge{node + im.Width, colorCost(c, im.Pix[off+im.YStride])})
+		edges = append(edges, astar.Edge{Node: node + im.Width, Cost: colorCost(c, im.Pix[off+im.YStride])})
 	}
 	return edges, nil
 }
