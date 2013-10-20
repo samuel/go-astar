@@ -1,7 +1,6 @@
 package astar
 
 import (
-	"fmt"
 	"math"
 	"testing"
 )
@@ -102,25 +101,26 @@ func TestAstar(t *testing.T) {
 		}
 	}
 	for y := 0; y < mp.height; y++ {
+		out := make([]byte, mp.width)
 		for x := 0; x < mp.width; x++ {
 			o := y*mp.width + x
 			pth := false
 			for _, p := range path {
 				if p == o {
-					fmt.Printf(".")
+					out[x] = '.'
 					pth = true
 					break
 				}
 			}
 			if !pth {
 				if mp.grid[y*mp.width+x] == 0 {
-					fmt.Printf(" ")
+					out[x] = ' '
 				} else {
-					fmt.Printf("#")
+					out[x] = '#'
 				}
 			}
 		}
-		fmt.Println()
+		t.Logf(string(out))
 	}
 }
 
