@@ -10,20 +10,20 @@ const (
 )
 
 type gridMap struct {
-	grid   []int
-	width  int
-	height int
+	grid   []int64
+	width  int64
+	height int64
 }
 
-func abs(i int) int {
+func abs(i int64) int64 {
 	if i < 0 {
 		i = -i
 	}
 	return i
 }
 
-func (g *gridMap) Neighbors(node int, edges []Edge) ([]Edge, error) {
-	addNode := func(x, y int, cost float64) {
+func (g *gridMap) Neighbors(node int64, edges []Edge) ([]Edge, error) {
+	addNode := func(x, y int64, cost float64) {
 		v := g.grid[y*g.width+x]
 		if v == 0 {
 			edges = append(edges, Edge{y*g.width + x, cost})
@@ -60,7 +60,7 @@ func (g *gridMap) Neighbors(node int, edges []Edge) ([]Edge, error) {
 	return edges, nil
 }
 
-func (g *gridMap) HeuristicCost(start int, end int) (float64, error) {
+func (g *gridMap) HeuristicCost(start, end int64) (float64, error) {
 	endY := end / g.width
 	endX := end % g.width
 	startY := start / g.width
@@ -72,7 +72,7 @@ func (g *gridMap) HeuristicCost(start int, end int) (float64, error) {
 
 func TestAstar(t *testing.T) {
 	mp := &gridMap{
-		grid: []int{
+		grid: []int64{
 			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
 			0, 1, 1, 0, 1, 0, 0, 0, 0, 0,
 			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
@@ -91,7 +91,7 @@ func TestAstar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := []int{50, 40, 30, 20, 10, 1, 2, 13, 23, 33, 43, 53, 63, 73, 83, 94, 85, 86, 77, 68, 59, 49, 39}
+	expected := []int64{50, 40, 30, 20, 10, 1, 2, 13, 23, 33, 43, 53, 63, 73, 83, 94, 85, 86, 77, 68, 59, 49, 39}
 	if len(path) < len(expected) {
 		t.Fatalf("Expected a path length of %d instead of %d", len(expected), len(path))
 	}
@@ -100,9 +100,9 @@ func TestAstar(t *testing.T) {
 			t.Fatalf("Expected node at path index %d to be %d instead of %d", i, e, path[i])
 		}
 	}
-	for y := 0; y < mp.height; y++ {
+	for y := int64(0); y < mp.height; y++ {
 		out := make([]byte, mp.width)
-		for x := 0; x < mp.width; x++ {
+		for x := int64(0); x < mp.width; x++ {
 			o := y*mp.width + x
 			pth := false
 			for _, p := range path {
@@ -126,7 +126,7 @@ func TestAstar(t *testing.T) {
 
 func TestImpossible(t *testing.T) {
 	mp := &gridMap{
-		grid: []int{
+		grid: []int64{
 			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
 			1, 1, 1, 0, 1, 0, 0, 0, 0, 0,
 			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
@@ -149,7 +149,7 @@ func TestImpossible(t *testing.T) {
 
 func BenchmarkFindPath(b *testing.B) {
 	mp := &gridMap{
-		grid: []int{
+		grid: []int64{
 			0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
 			0, 1, 1, 0, 1, 0, 0, 0, 0, 0,
 			0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
