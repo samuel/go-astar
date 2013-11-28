@@ -34,7 +34,7 @@ type ImageMap struct {
 
 func colorCost(c1, c2 byte) float64 {
 	a := abs(int(c1) - int(c2))
-	return float64(a*a + 1)
+	return float64(a * a)
 }
 
 func NewImageMap(img image.Image) (*ImageMap, error) {
@@ -128,28 +128,28 @@ func (im *ImageMap) Neighbors(node astar.Node, edges []astar.Edge) ([]astar.Edge
 	c := im.Pix[off]
 
 	if x > 0 {
-		edges = append(edges, astar.Edge{Node: node - 1, Cost: colorCost(c, im.Pix[off-im.XStride])})
+		edges = append(edges, astar.Edge{Node: node - 1, Cost: 1 + colorCost(c, im.Pix[off-im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{Node: node - 1 - astar.Node(im.Width), Cost: math.Sqrt2 * colorCost(c, im.Pix[off-im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{Node: node - 1 - astar.Node(im.Width), Cost: math.Sqrt2 + colorCost(c, im.Pix[off-im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{Node: node - 1 + astar.Node(im.Width), Cost: math.Sqrt2 * colorCost(c, im.Pix[off-im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{Node: node - 1 + astar.Node(im.Width), Cost: math.Sqrt2 + colorCost(c, im.Pix[off-im.XStride+im.YStride])})
 		}
 	}
 	if x < im.Width-1 {
-		edges = append(edges, astar.Edge{Node: node + 1, Cost: colorCost(c, im.Pix[off+im.XStride])})
+		edges = append(edges, astar.Edge{Node: node + 1, Cost: 1 + colorCost(c, im.Pix[off+im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{Node: node + 1 - astar.Node(im.Width), Cost: math.Sqrt2 * colorCost(c, im.Pix[off+im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{Node: node + 1 - astar.Node(im.Width), Cost: math.Sqrt2 + colorCost(c, im.Pix[off+im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{Node: node + 1 + astar.Node(im.Width), Cost: math.Sqrt2 * colorCost(c, im.Pix[off+im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{Node: node + 1 + astar.Node(im.Width), Cost: math.Sqrt2 + colorCost(c, im.Pix[off+im.XStride+im.YStride])})
 		}
 	}
 	if y > 0 {
-		edges = append(edges, astar.Edge{Node: node - astar.Node(im.Width), Cost: colorCost(c, im.Pix[off-im.YStride])})
+		edges = append(edges, astar.Edge{Node: node - astar.Node(im.Width), Cost: 1 + colorCost(c, im.Pix[off-im.YStride])})
 	}
 	if y < im.Height-1 {
-		edges = append(edges, astar.Edge{Node: node + astar.Node(im.Width), Cost: colorCost(c, im.Pix[off+im.YStride])})
+		edges = append(edges, astar.Edge{Node: node + astar.Node(im.Width), Cost: 1 + colorCost(c, im.Pix[off+im.YStride])})
 	}
 	return edges, nil
 }
