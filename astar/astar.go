@@ -10,21 +10,21 @@ const (
 )
 
 type nodeInfo struct {
-	node          int64
-	parent        int64   // the node from which we came to get here
-	index         int64   // index of the node in the heap
+	node          Node
+	parent        Node    // the node from which we came to get here
+	index         int     // index of the node in the heap
 	cost          float32 // current cost from start node to this node
 	predictedCost float32 // heuristic cost from this node to end node
 }
 
 type state struct {
-	info    map[int64]*nodeInfo
+	info    map[Node]*nodeInfo
 	heap    []*nodeInfo
 	maxCost float32
 }
 
-func (s *state) pathToNode(node *nodeInfo) []int64 {
-	path := make([]int64, 0, 128)
+func (s *state) pathToNode(node *nodeInfo) []Node {
+	path := make([]Node, 0, 128)
 	for n := node; n != nil; n = s.info[n.parent] {
 		path = append(path, n.node)
 	}
@@ -39,26 +39,26 @@ func (s *state) pathToNode(node *nodeInfo) []int64 {
 
 func newState(capacity int) *state {
 	return &state{
-		info:    make(map[int64]*nodeInfo, capacity),
+		info:    make(map[Node]*nodeInfo, capacity),
 		heap:    make([]*nodeInfo, 0, defaultListCapacity),
 		maxCost: float32(math.Inf(1)),
 	}
 }
 
-func (nl *state) less(i, j int64) bool {
+func (nl *state) less(i, j int) bool {
 	li := nl.heap[i]
 	lj := nl.heap[j]
 	return (li.cost + li.predictedCost) < (lj.cost + lj.predictedCost)
 }
 
-func (nl *state) swap(i, j int64) {
+func (nl *state) swap(i, j int) {
 	l := nl.heap
 	l[i], l[j] = l[j], l[i]
 	l[i].index = i
 	l[j].index = j
 }
 
-func (nl *state) up(j int64) {
+func (nl *state) up(j int) {
 	for {
 		i := (j - 1) / 2 // parent
 		if i == j || !nl.less(j, i) {
@@ -69,7 +69,7 @@ func (nl *state) up(j int64) {
 	}
 }
 
-func (nl *state) down(i, n int64) {
+func (nl *state) down(i, n int) {
 	for {
 		j1 := 2*i + 1
 		if j1 >= n || j1 < 0 { // j1 < 0 after int overflow
@@ -88,7 +88,7 @@ func (nl *state) down(i, n int64) {
 }
 
 func (nl *state) popBest() *nodeInfo {
-	n := int64(len(nl.heap) - 1)
+	n := len(nl.heap) - 1
 	if n < 0 {
 		return nil
 	}
@@ -103,14 +103,14 @@ func (nl *state) popBest() *nodeInfo {
 func (nl *state) addNodeInfo(ni *nodeInfo) {
 	nl.info[ni.node] = ni
 	nl.heap = append(nl.heap, ni)
-	i := int64(len(nl.heap) - 1)
+	i := len(nl.heap) - 1
 	ni.index = i
 	nl.up(i)
 }
 
 func (nl *state) updateNodeInfo(ni *nodeInfo) {
 	index := ni.index
-	n := int64(len(nl.heap))
+	n := len(nl.heap)
 	nl.down(index, n)
 	nl.up(index)
 }
@@ -118,7 +118,7 @@ func (nl *state) updateNodeInfo(ni *nodeInfo) {
 // Find the optimal path through the graph from start to end and
 // return the nodes in order for the path. If no path is found
 // because it's impossible to reach end from start then return an error.
-func FindPath(mp Graph, start, end int64) ([]int64, error) {
+func FindPath(mp Graph, start, end Node) ([]Node, error) {
 	mapCapacity := int(end - start)
 	if mapCapacity < 0 {
 		mapCapacity = -mapCapacity

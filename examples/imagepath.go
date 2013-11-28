@@ -121,44 +121,44 @@ func NewImageMap(img image.Image) (*ImageMap, error) {
 	return im, nil
 }
 
-func (im *ImageMap) Neighbors(node int, edges []astar.Edge) ([]astar.Edge, error) {
-	x := node % im.Width
-	y := node / im.Width
+func (im *ImageMap) Neighbors(node astar.Node, edges []astar.Edge) ([]astar.Edge, error) {
+	x := int(node) % im.Width
+	y := int(node) / im.Width
 	off := y*im.YStride + x*im.XStride
 	c := im.Pix[off]
 
 	if x > 0 {
 		edges = append(edges, astar.Edge{Node: node - 1, Cost: colorCost(c, im.Pix[off-im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{Node: node - 1 - im.Width, Cost: colorCost(c, im.Pix[off-im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{Node: node - 1 - astar.Node(im.Width), Cost: colorCost(c, im.Pix[off-im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{Node: node - 1 + im.Width, Cost: colorCost(c, im.Pix[off-im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{Node: node - 1 + astar.Node(im.Width), Cost: colorCost(c, im.Pix[off-im.XStride+im.YStride])})
 		}
 	}
 	if x < im.Width-1 {
 		edges = append(edges, astar.Edge{Node: node + 1, Cost: colorCost(c, im.Pix[off+im.XStride])})
 		if y > 0 {
-			edges = append(edges, astar.Edge{Node: node + 1 - im.Width, Cost: colorCost(c, im.Pix[off+im.XStride-im.YStride])})
+			edges = append(edges, astar.Edge{Node: node + 1 - astar.Node(im.Width), Cost: colorCost(c, im.Pix[off+im.XStride-im.YStride])})
 		}
 		if y < im.Height-1 {
-			edges = append(edges, astar.Edge{Node: node + 1 + im.Width, Cost: colorCost(c, im.Pix[off+im.XStride+im.YStride])})
+			edges = append(edges, astar.Edge{Node: node + 1 + astar.Node(im.Width), Cost: colorCost(c, im.Pix[off+im.XStride+im.YStride])})
 		}
 	}
 	if y > 0 {
-		edges = append(edges, astar.Edge{Node: node - im.Width, Cost: colorCost(c, im.Pix[off-im.YStride])})
+		edges = append(edges, astar.Edge{Node: node - astar.Node(im.Width), Cost: colorCost(c, im.Pix[off-im.YStride])})
 	}
 	if y < im.Height-1 {
-		edges = append(edges, astar.Edge{Node: node + im.Width, Cost: colorCost(c, im.Pix[off+im.YStride])})
+		edges = append(edges, astar.Edge{Node: node + astar.Node(im.Width), Cost: colorCost(c, im.Pix[off+im.YStride])})
 	}
 	return edges, nil
 }
 
-func (im *ImageMap) HeuristicCost(start int, end int) (float64, error) {
-	endY := end / im.Width
-	endX := end % im.Width
-	startY := start / im.Width
-	startX := start % im.Width
+func (im *ImageMap) HeuristicCost(start, end astar.Node) (float64, error) {
+	endY := int(end) / im.Width
+	endX := int(end) % im.Width
+	startY := int(start) / im.Width
+	startX := int(start) % im.Width
 	a := abs(endY - startY)
 	b := abs(endX - startX)
 	return math.Sqrt(float64(a*a + b*b)), nil // * im.Stddev / 2, nil
@@ -204,7 +204,7 @@ func main() {
 	runtime.ReadMemStats(&memStats)
 	totalAlloc := memStats.TotalAlloc
 	t := time.Now()
-	path, err := astar.FindPath(im, 0, img.Bounds().Dx()-1+img.Bounds().Dx()*(img.Bounds().Dy()-1))
+	path, err := astar.FindPath(im, 0, astar.Node(img.Bounds().Dx()-1+img.Bounds().Dx()*(img.Bounds().Dy()-1)))
 	pprof.StopCPUProfile()
 	if err != nil {
 		log.Fatal(err)
@@ -217,8 +217,8 @@ func main() {
 
 	log.Println("Rendering path")
 	for _, node := range path {
-		x := node % img.Bounds().Dx()
-		y := node / img.Bounds().Dx()
+		x := int(node) % img.Bounds().Dx()
+		y := int(node) / img.Bounds().Dx()
 		im.Set(x, y, color.RGBA{0, 255, 0, 255})
 	}
 
