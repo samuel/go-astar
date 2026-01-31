@@ -2,6 +2,7 @@ package astar
 
 import (
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -105,12 +106,9 @@ func TestAstar(t *testing.T) {
 		for x := 0; x < mp.width; x++ {
 			o := y*mp.width + x
 			pth := false
-			for _, p := range path {
-				if p == Node(o) {
-					out[x] = '.'
-					pth = true
-					break
-				}
+			if slices.Contains(path, Node(o)) {
+				out[x] = '.'
+				pth = true
 			}
 			if !pth {
 				if mp.grid[y*mp.width+x] == 0 {
@@ -164,7 +162,7 @@ func BenchmarkFindPath(b *testing.B) {
 		width:  10,
 		height: 10,
 	}
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		FindPath(mp, Node(5*mp.width), Node(3*mp.width+9))
 	}
 }

@@ -1,7 +1,6 @@
-A* Package for Go
-=================
+# A\* Package for Go
 
-[![Build Status](https://travis-ci.org/samuel/go-astar.png)](https://travis-ci.org/samuel/go-astar)
+Documentation: https://pkg.go.dev/github.com/samuel/go-astar
 
-This package is just a code example of implementing A* in Go. It's probably
+This package is just a code example of implementing A\* in Go. It's probably
 not suitable for any real use.

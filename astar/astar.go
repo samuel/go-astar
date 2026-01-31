@@ -30,7 +30,7 @@ func (s *state) pathToNode(node *nodeInfo) []Node {
 	}
 	// Reverse the path since we built it backwards
 	n := len(path) / 2
-	for i := 0; i < n; i++ {
+	for i := range n {
 		j := len(path) - i - 1
 		path[i], path[j] = path[j], path[i]
 	}
